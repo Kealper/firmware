@@ -196,6 +196,7 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
         // If the user has specified they don't want our node to share its location, make sure to tell the phone
         // app not to send locations on our behalf.
         fromRadioScratch.which_payload_variant = meshtastic_FromRadio_my_info_tag;
+        strncpy(myNodeInfo.pio_env, optstr(APP_ENV), sizeof(myNodeInfo.pio_env));
         fromRadioScratch.my_info = myNodeInfo;
         state = STATE_SEND_OWN_NODEINFO;
 
@@ -596,10 +597,13 @@ bool PhoneAPI::handleToRadioPacket(meshtastic_MeshPacket &p)
 {
     printPacket("PACKET FROM PHONE", &p);
 
+// For use with the simulator, we should not ignore duplicate packets
+#if !(defined(ARCH_PORTDUINO) && !HAS_RADIO)
     if (p.id > 0 && wasSeenRecently(p.id)) {
         LOG_DEBUG("Ignoring packet from phone, already seen recently");
         return false;
     }
+#endif
 
     if (p.decoded.portnum == meshtastic_PortNum_TRACEROUTE_APP && lastPortNumToRadio[p.decoded.portnum] &&
         Throttle::isWithinTimespanMs(lastPortNumToRadio[p.decoded.portnum], THIRTY_SECONDS_MS)) {

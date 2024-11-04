@@ -81,14 +81,17 @@ int32_t Router::runOnce()
  */
 void Router::enqueueReceivedMessage(meshtastic_MeshPacket *p)
 {
-    if (fromRadioQueue.enqueue(p, 0)) { // NOWAIT - fixme, if queue is full, delete older messages
-
-        // Nasty hack because our threading is primitive.  interfaces shouldn't need to know about routers FIXME
-        setReceivedMessage();
-    } else {
-        printPacket("BUG! fromRadioQueue is full! Discarding!", p);
-        packetPool.release(p);
+    // Try enqueue until successful
+    while (!fromRadioQueue.enqueue(p, 0)) {
+        meshtastic_MeshPacket *old_p;
+        old_p = fromRadioQueue.dequeuePtr(0); // Dequeue and discard the oldest packet
+        if (old_p) {
+            printPacket("fromRadioQ full, drop oldest!", old_p);
+            packetPool.release(old_p);
+        }
     }
+    // Nasty hack because our threading is primitive.  interfaces shouldn't need to know about routers FIXME
+    setReceivedMessage();
 }
 
 /// Generate a unique packet id
@@ -133,10 +136,9 @@ meshtastic_MeshPacket *Router::allocForSending()
 /**
  * Send an ack or a nak packet back towards whoever sent idFrom
  */
-void Router::sendAckNak(meshtastic_Routing_Error err, NodeNum to, PacketId idFrom, ChannelIndex chIndex, uint8_t hopStart,
-                        uint8_t hopLimit)
+void Router::sendAckNak(meshtastic_Routing_Error err, NodeNum to, PacketId idFrom, ChannelIndex chIndex, uint8_t hopLimit)
 {
-    routingModule->sendAckNak(err, to, idFrom, chIndex, hopStart, hopLimit);
+    routingModule->sendAckNak(err, to, idFrom, chIndex, hopLimit);
 }
 
 void Router::abortSendAndNak(meshtastic_Routing_Error err, meshtastic_MeshPacket *p)
@@ -181,7 +183,7 @@ ErrorCode Router::sendLocal(meshtastic_MeshPacket *p, RxSource src)
     } else {
         // If we are sending a broadcast, we also treat it as if we just received it ourself
         // this allows local apps (and PCs) to see broadcasts sourced locally
-        if (p->to == NODENUM_BROADCAST) {
+        if (isBroadcast(p->to)) {
             handleReceived(p, src);
         }
 
@@ -240,7 +242,7 @@ ErrorCode Router::send(meshtastic_MeshPacket *p)
     // assert
 
     // Never set the want_ack flag on broadcast packets sent over the air.
-    if (p->to == NODENUM_BROADCAST)
+    if (isBroadcast(p->to))
         p->want_ack = false;
 
     // Up until this point we might have been using 0 for the from address (if it started with the phone), but when we send over
@@ -328,7 +330,7 @@ bool perhapsDecode(meshtastic_MeshPacket *p)
     memcpy(ScratchEncrypted, p->encrypted.bytes, rawSize);
 #if !(MESHTASTIC_EXCLUDE_PKI)
     // Attempt PKI decryption first
-    if (p->channel == 0 && isToUs(p) && p->to > 0 && p->to != NODENUM_BROADCAST && nodeDB->getMeshNode(p->from) != nullptr &&
+    if (p->channel == 0 && isToUs(p) && p->to > 0 && !isBroadcast(p->to) && nodeDB->getMeshNode(p->from) != nullptr &&
         nodeDB->getMeshNode(p->from)->user.public_key.size > 0 && nodeDB->getMeshNode(p->to)->user.public_key.size > 0 &&
         rawSize > MESHTASTIC_PKC_OVERHEAD) {
         LOG_DEBUG("Attempting PKI decryption");
@@ -423,7 +425,7 @@ bool perhapsDecode(meshtastic_MeshPacket *p)
     }
 }
 
-/** Return 0 for success or a Routing_Errror code for failure
+/** Return 0 for success or a Routing_Error code for failure
  */
 meshtastic_Routing_Error perhapsEncode(meshtastic_MeshPacket *p)
 {
@@ -493,7 +495,7 @@ meshtastic_Routing_Error perhapsEncode(meshtastic_MeshPacket *p)
             // Don't use PKC if it's not explicitly requested and a non-primary channel is requested
             !(p->pki_encrypted != true && p->channel > 0) &&
             // Check for valid keys and single node destination
-            config.security.private_key.size == 32 && p->to != NODENUM_BROADCAST && node != nullptr &&
+            config.security.private_key.size == 32 && !isBroadcast(p->to) && node != nullptr &&
             // Check for a known public key for the destination
             (node->user.public_key.size == 32) &&
             // Some portnums either make no sense to send with PKC
@@ -591,19 +593,20 @@ void Router::handleReceived(meshtastic_MeshPacket *p, RxSource src)
             skipHandle = true;
         }
 
+        bool shouldIgnoreNonstandardPorts =
+            config.device.rebroadcast_mode == meshtastic_Config_DeviceConfig_RebroadcastMode_CORE_PORTNUMS_ONLY;
 #if USERPREFS_EVENT_MODE
-        if (p->which_payload_variant == meshtastic_MeshPacket_decoded_tag &&
-            (p->decoded.portnum == meshtastic_PortNum_ATAK_FORWARDER || p->decoded.portnum == meshtastic_PortNum_ATAK_PLUGIN ||
-             p->decoded.portnum == meshtastic_PortNum_PAXCOUNTER_APP || p->decoded.portnum == meshtastic_PortNum_IP_TUNNEL_APP ||
-             p->decoded.portnum == meshtastic_PortNum_AUDIO_APP || p->decoded.portnum == meshtastic_PortNum_PRIVATE_APP ||
-             p->decoded.portnum == meshtastic_PortNum_DETECTION_SENSOR_APP ||
-             p->decoded.portnum == meshtastic_PortNum_RANGE_TEST_APP ||
-             p->decoded.portnum == meshtastic_PortNum_REMOTE_HARDWARE_APP)) {
-            LOG_DEBUG("Ignoring packet on blacklisted portnum during event");
+        shouldIgnoreNonstandardPorts = true;
+#endif
+        if (shouldIgnoreNonstandardPorts && p->which_payload_variant == meshtastic_MeshPacket_decoded_tag &&
+            IS_ONE_OF(p->decoded.portnum, meshtastic_PortNum_ATAK_FORWARDER, meshtastic_PortNum_ATAK_PLUGIN,
+                      meshtastic_PortNum_PAXCOUNTER_APP, meshtastic_PortNum_IP_TUNNEL_APP, meshtastic_PortNum_AUDIO_APP,
+                      meshtastic_PortNum_PRIVATE_APP, meshtastic_PortNum_DETECTION_SENSOR_APP, meshtastic_PortNum_RANGE_TEST_APP,
+                      meshtastic_PortNum_REMOTE_HARDWARE_APP)) {
+            LOG_DEBUG("Ignoring packet on blacklisted portnum for CORE_PORTNUMS_ONLY");
             cancelSending(p->from, p->id);
             skipHandle = true;
         }
-#endif
     } else {
         printPacket("packet decoding failed or skipped (no PSK?)", p);
     }
@@ -615,7 +618,7 @@ void Router::handleReceived(meshtastic_MeshPacket *p, RxSource src)
 #if !MESHTASTIC_EXCLUDE_MQTT
         // Mark as pki_encrypted if it is not yet decoded and MQTT encryption is also enabled, hash matches and it's a DM not to
         // us (because we would be able to decrypt it)
-        if (!decoded && moduleConfig.mqtt.encryption_enabled && p->channel == 0x00 && p->to != NODENUM_BROADCAST && !isToUs(p))
+        if (!decoded && moduleConfig.mqtt.encryption_enabled && p->channel == 0x00 && !isBroadcast(p->to) && !isToUs(p))
             p_encrypted->pki_encrypted = true;
         // After potentially altering it, publish received message to MQTT if we're not the original transmitter of the packet
         if ((decoded || p_encrypted->pki_encrypted) && moduleConfig.mqtt.enabled && !isFromUs(p) && mqtt)

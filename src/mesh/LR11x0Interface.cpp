@@ -67,8 +67,10 @@ template <typename T> bool LR11x0Interface<T>::init()
         power = LR1110_MAX_POWER;
 
     if ((power > LR1120_MAX_POWER) &&
-        (config.lora.region == meshtastic_Config_LoRaConfig_RegionCode_LORA_24)) // clamp again if wide freq range
+        (config.lora.region == meshtastic_Config_LoRaConfig_RegionCode_LORA_24)) { // clamp again if wide freq range
         power = LR1120_MAX_POWER;
+        preambleLength = 12; // 12 is the default for operation above 2GHz
+    }
 
     limitPower();
 
@@ -158,11 +160,6 @@ template <typename T> bool LR11x0Interface<T>::reconfigure()
     err = lora.setCodingRate(cr);
     if (err != RADIOLIB_ERR_NONE)
         RECORD_CRITICALERROR(meshtastic_CriticalErrorCode_INVALID_RADIO_SETTING);
-
-    // Hmm - seems to lower SNR when the signal levels are high.  Leaving off for now...
-    // TODO: Confirm gain registers are okay now
-    // err = lora.setRxGain(true);
-    // assert(err == RADIOLIB_ERR_NONE);
 
     err = lora.setSyncWord(syncWord);
     assert(err == RADIOLIB_ERR_NONE);

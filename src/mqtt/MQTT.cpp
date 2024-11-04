@@ -717,7 +717,7 @@ bool MQTT::isPrivateIpAddress(const char address[])
     // Even if it's not a valid IP address, we will know it's not a domain.
     bool hasColon = false;
     int numDots = 0;
-    for (int i = 0; i < length; i++) {
+    for (size_t i = 0; i < length; i++) {
         if (!isdigit(address[i]) && address[i] != '.' && address[i] != ':') {
             return false;
         }
@@ -746,7 +746,8 @@ bool MQTT::isPrivateIpAddress(const char address[])
     }
 
     // Check the easy ones first.
-    if (strcmp(address, "127.0.0.1") == 0 || strncmp(address, "10.", 3) == 0 || strncmp(address, "192.168", 7) == 0) {
+    if (strcmp(address, "127.0.0.1") == 0 || strncmp(address, "10.", 3) == 0 || strncmp(address, "192.168", 7) == 0 ||
+        strncmp(address, "169.254", 7) == 0) {
         return true;
     }
 

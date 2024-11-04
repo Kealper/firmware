@@ -16,7 +16,7 @@ bool NodeInfoModule::handleReceivedProtobuf(const meshtastic_MeshPacket &mp, mes
 
     bool hasChanged = nodeDB->updateUser(getFrom(&mp), p, mp.channel);
 
-    bool wasBroadcast = mp.to == NODENUM_BROADCAST;
+    bool wasBroadcast = isBroadcast(mp.to);
 
     // Show new nodes on LCD screen
     if (wasBroadcast) {
@@ -80,6 +80,12 @@ meshtastic_MeshPacket *NodeInfoModule::allocReply()
     } else {
         ignoreRequest = false; // Don't ignore requests anymore
         meshtastic_User &u = owner;
+
+        // Strip the public key if the user is licensed
+        if (u.is_licensed && u.public_key.size > 0) {
+            u.public_key.bytes[0] = 0;
+            u.public_key.size = 0;
+        }
 
         LOG_INFO("sending owner %s/%s/%s", u.id, u.long_name, u.short_name);
         lastSentToMesh = millis();

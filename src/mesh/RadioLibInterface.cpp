@@ -11,6 +11,10 @@
 #include <pb_decode.h>
 #include <pb_encode.h>
 
+#if ARCH_PORTDUINO
+#include "PortduinoGlue.h"
+#include "meshUtils.h"
+#endif
 void LockingArduinoHal::spiBeginTransaction()
 {
     spiLock->lock();
@@ -20,9 +24,9 @@ void LockingArduinoHal::spiBeginTransaction()
 
 void LockingArduinoHal::spiEndTransaction()
 {
-    spiLock->unlock();
-
     ArduinoHal::spiEndTransaction();
+
+    spiLock->unlock();
 }
 #if ARCH_PORTDUINO
 void LockingArduinoHal::spiTransfer(uint8_t *out, size_t len, uint8_t *in)
@@ -278,11 +282,14 @@ void RadioLibInterface::onNotify(uint32_t notification)
                     // Send any outgoing packets we have ready
                     meshtastic_MeshPacket *txp = txQueue.dequeue();
                     assert(txp);
+                    bool isLoraTx = txp->to != NODENUM_BROADCAST_NO_LORA;
                     startSend(txp);
 
-                    // Packet has been sent, count it toward our TX airtime utilization.
-                    uint32_t xmitMsec = getPacketTime(txp);
-                    airTime->logAirtime(TX_LOG, xmitMsec);
+                    if (isLoraTx) {
+                        // Packet has been sent, count it toward our TX airtime utilization.
+                        uint32_t xmitMsec = getPacketTime(txp);
+                        airTime->logAirtime(TX_LOG, xmitMsec);
+                    }
                 }
             }
         } else {
@@ -341,7 +348,7 @@ void RadioLibInterface::handleTransmitInterrupt()
     // ignore the transmit interrupt
     if (sendingPacket)
         completeSending();
-    powerMon->clearState(meshtastic_PowerMon_State_Lora_TXOn); // But our transmitter is deffinitely off now
+    powerMon->clearState(meshtastic_PowerMon_State_Lora_TXOn); // But our transmitter is definitely off now
 }
 
 void RadioLibInterface::completeSending()
@@ -390,6 +397,11 @@ void RadioLibInterface::handleReceiveInterrupt()
 #endif
 
     int state = iface->readData((uint8_t *)&radioBuffer, length);
+#if ARCH_PORTDUINO
+    if (settingsMap[logoutputlevel] == level_trace) {
+        printBytes("Raw incoming packet: ", (uint8_t *)&radioBuffer, length);
+    }
+#endif
     if (state != RADIOLIB_ERR_NONE) {
         LOG_ERROR("ignoring received packet due to error=%d", state);
         rxBad++;
@@ -467,7 +479,10 @@ void RadioLibInterface::setStandby()
 void RadioLibInterface::startSend(meshtastic_MeshPacket *txp)
 {
     printPacket("Starting low level send", txp);
-    if (disabled || !config.lora.tx_enabled) {
+    if (txp->to == NODENUM_BROADCAST_NO_LORA) {
+        LOG_DEBUG("Drop Tx packet because dest is broadcast no-lora");
+        packetPool.release(txp);
+    } else if (disabled || !config.lora.tx_enabled) {
         LOG_WARN("Drop Tx packet because LoRa Tx disabled");
         packetPool.release(txp);
     } else {
