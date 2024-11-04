@@ -124,24 +124,27 @@ void enterDfuMode()
 #ifdef RP2040_SLOW_CLOCK
 void initVariant()
 {
+    /* Set the system frequency to 48MHz, this is as slow as we can go while keeping all systems functional */
+    set_sys_clock_48mhz();
+
     /* Set the system frequency to 18 MHz. */
-    set_sys_clock_khz(18 * KHZ, false);
+    // set_sys_clock_khz(18 * KHZ, false);
     /* The previous line automatically detached clk_peri from clk_sys, and
        attached it to pll_usb. We need to attach clk_peri back to system PLL to keep SPI
        working at this low speed.
        For details see https://github.com/jgromes/RadioLib/discussions/938
     */
-    clock_configure(clk_peri,
-                    0,                                                // No glitchless mux
-                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-                    18 * MHZ,                                         // Input frequency
-                    18 * MHZ                                          // Output (must be same as no divider)
-    );
+    // clock_configure(clk_peri,
+    //                 0,                                                // No glitchless mux
+    //                 CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
+    //                 18 * MHZ,                                         // Input frequency
+    //                 18 * MHZ                                          // Output (must be same as no divider)
+    // );
     /* Run also ADC on lower clk_sys. */
-    clock_configure(clk_adc, 0, CLOCKS_CLK_ADC_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, 18 * MHZ, 18 * MHZ);
+    // clock_configure(clk_adc, 0, CLOCKS_CLK_ADC_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, 18 * MHZ, 18 * MHZ);
     /* Run RTC from XOSC since USB clock is off */
-    clock_configure(clk_rtc, 0, CLOCKS_CLK_RTC_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 12 * MHZ, 47 * KHZ);
+    // clock_configure(clk_rtc, 0, CLOCKS_CLK_RTC_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 12 * MHZ, 47 * KHZ);
     /* Turn off USB PLL */
-    pll_deinit(pll_usb);
+    // pll_deinit(pll_usb);
 }
 #endif
