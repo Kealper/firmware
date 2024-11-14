@@ -16,10 +16,7 @@
 #include "meshtastic/atak.pb.h"
 #include "sleep.h"
 #include "target_specific.h"
-
-extern "C" {
 #include <Throttle.h>
-}
 
 PositionModule *positionModule;
 
@@ -367,7 +364,7 @@ int32_t PositionModule::runOnce()
         sleepOnNextExecution = false;
         uint32_t nightyNightMs = Default::getConfiguredOrDefaultMs(config.position.position_broadcast_secs);
         LOG_DEBUG("Sleep for %ims, then awaking to send position again", nightyNightMs);
-        doDeepSleep(nightyNightMs, false);
+        doDeepSleep(nightyNightMs, false, false);
     }
 
     meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(nodeDB->getNodeNum());
