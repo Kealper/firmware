@@ -141,7 +141,8 @@ void initVariant()
 #elif RP2XX0_CLOCK_OVERRIDE == 48
     set_sys_clock_pll(768000000, 4, 4); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 48
 #else
-    set_sys_clock_khz(RP2XX0_CLOCK_OVERRIDE * KHZ); // A preset wasn't chosen, fall back to old method for arbitrary frequencies
+    set_sys_clock_khz(RP2XX0_CLOCK_OVERRIDE * KHZ,
+                      false); // A preset wasn't chosen, fall back to old method for arbitrary frequencies
 #endif
 
     /* The previous line automatically detached clk_peri from clk_sys, and
