@@ -6,6 +6,10 @@
 #include <pico/stdlib.h>
 #include <pico/unique_id.h>
 
+#ifndef RP2XX0_CLOCK_OVERRIDE
+#define RP2XX0_CLOCK_OVERRIDE 18
+#endif
+
 void setBluetoothEnable(bool enable)
 {
     // not needed
@@ -126,10 +130,8 @@ void initVariant()
 {
 /* This define sets the clock speed of multiple clocks on the SoC
    Low-power presets available for 18MHz, 24MHz, 36MHz, and 48MHz
-   Setting to 48MHz will leave the USB PLL enabled, any slower and USB must be disabled
+   Setting to 48MHz or higher will leave the USB PLL enabled, any slower and USB must be disabled
 */
-#define RP2XX0_CLOCK_OVERRIDE 18
-
 #if RP2XX0_CLOCK_OVERRIDE == 18
     set_sys_clock_pll(756000000, 7, 6); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 18
 #elif RP2XX0_CLOCK_OVERRIDE == 24
@@ -138,6 +140,8 @@ void initVariant()
     set_sys_clock_pll(756000000, 7, 3); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 36
 #elif RP2XX0_CLOCK_OVERRIDE == 48
     set_sys_clock_pll(768000000, 4, 4); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 48
+#else
+    set_sys_clock_khz(RP2XX0_CLOCK_OVERRIDE * KHZ); // A preset wasn't chosen, fall back to old method for arbitrary frequencies
 #endif
 
     /* The previous line automatically detached clk_peri from clk_sys, and
@@ -159,7 +163,7 @@ void initVariant()
     clock_configure(clk_rtc, 0, CLOCKS_CLK_RTC_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 12 * MHZ, 47 * KHZ);
 #endif
     /* Turn off USB PLL if set speed is lower than the USB spec allows */
-#if RP2XX0_CLOCK_OVERRIDE != 48
+#if RP2XX0_CLOCK_OVERRIDE < 48
     pll_deinit(pll_usb);
 #endif
 }
