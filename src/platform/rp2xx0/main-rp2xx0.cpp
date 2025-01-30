@@ -79,10 +79,6 @@ void setBluetoothEnable(bool enable)
     // not needed
 }
 
-#ifndef RP2XX0_CLOCK_OVERRIDE
-#define RP2XX0_CLOCK_OVERRIDE 18
-#endif
-
 void updateBatteryLevel(uint8_t level)
 {
     // not needed
@@ -138,23 +134,8 @@ void enterDfuMode()
 #ifdef RP2040_SLOW_CLOCK
 void initVariant()
 {
-/* This define sets the clock speed of multiple clocks on the SoC
-   Low-power presets available for 18MHz, 24MHz, 36MHz, and 48MHz
-   Setting to 48MHz or higher will leave the USB PLL enabled, any slower and USB must be disabled
-*/
-#if RP2XX0_CLOCK_OVERRIDE == 18
-    set_sys_clock_pll(756000000, 7, 6); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 18
-#elif RP2XX0_CLOCK_OVERRIDE == 24
-    set_sys_clock_pll(840000000, 7, 5); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 24
-#elif RP2XX0_CLOCK_OVERRIDE == 36
-    set_sys_clock_pll(756000000, 7, 3); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 36
-#elif RP2XX0_CLOCK_OVERRIDE == 48
-    set_sys_clock_pll(768000000, 4, 4); // pico-sdk/src/rp2_common/hardware_clocks/scripts % python3 vcocalc.py --low-vco 48
-#else
-    set_sys_clock_khz(RP2XX0_CLOCK_OVERRIDE * KHZ,
-                      false); // A preset wasn't chosen, fall back to old method for arbitrary frequencies
-#endif
-
+    /* Set the system frequency to 18 MHz. */
+    set_sys_clock_khz(18 * KHZ, false);
     /* The previous line automatically detached clk_peri from clk_sys, and
        attached it to pll_usb. We need to attach clk_peri back to system PLL to keep SPI
        working at this low speed.
@@ -163,19 +144,14 @@ void initVariant()
     clock_configure(clk_peri,
                     0,                                                // No glitchless mux
                     CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-                    RP2XX0_CLOCK_OVERRIDE * MHZ,                      // Input frequency
-                    RP2XX0_CLOCK_OVERRIDE * MHZ                       // Output (must be same as no divider)
+                    18 * MHZ,                                         // Input frequency
+                    18 * MHZ                                          // Output (must be same as no divider)
     );
     /* Run also ADC on lower clk_sys. */
-    clock_configure(clk_adc, 0, CLOCKS_CLK_ADC_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, RP2XX0_CLOCK_OVERRIDE * MHZ,
-                    RP2XX0_CLOCK_OVERRIDE * MHZ);
-    /* Run RTC from XOSC since USB clock is off if chipset has RTC, RP2350 does not */
-#if !defined(ARCH_RP2350)
+    clock_configure(clk_adc, 0, CLOCKS_CLK_ADC_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, 18 * MHZ, 18 * MHZ);
+    /* Run RTC from XOSC since USB clock is off */
     clock_configure(clk_rtc, 0, CLOCKS_CLK_RTC_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 12 * MHZ, 47 * KHZ);
-#endif
-    /* Turn off USB PLL if set speed is lower than the USB spec allows */
-#if RP2XX0_CLOCK_OVERRIDE < 48
+    /* Turn off USB PLL */
     pll_deinit(pll_usb);
-#endif
 }
 #endif
