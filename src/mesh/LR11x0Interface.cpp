@@ -20,12 +20,18 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 
 // Particular boards might define a different max power based on what their hardware can do, default to max power output if not
 // specified (may be dangerous if using external PA and LR11x0 power config forgotten)
+#if ARCH_PORTDUINO
+#define LR1110_MAX_POWER settingsMap[lr1110_max_power]
+#endif
 #ifndef LR1110_MAX_POWER
 #define LR1110_MAX_POWER 22
 #endif
 
 // the 2.4G part maxes at 13dBm
 
+#if ARCH_PORTDUINO
+#define LR1120_MAX_POWER settingsMap[lr1120_max_power]
+#endif
 #ifndef LR1120_MAX_POWER
 #define LR1120_MAX_POWER 13
 #endif
@@ -48,8 +54,10 @@ template <typename T> bool LR11x0Interface<T>::init()
     digitalWrite(LR11X0_POWER_EN, HIGH);
 #endif
 
+#if ARCH_PORTDUINO
+    float tcxoVoltage = (float)settingsMap[dio3_tcxo_voltage] / 1000;
 // FIXME: correct logic to default to not using TCXO if no voltage is specified for LR11x0_DIO3_TCXO_VOLTAGE
-#if !defined(LR11X0_DIO3_TCXO_VOLTAGE)
+#elif !defined(LR11X0_DIO3_TCXO_VOLTAGE)
     float tcxoVoltage =
         0; // "TCXO reference voltage to be set on DIO3. Defaults to 1.6 V, set to 0 to skip." per
            // https://github.com/jgromes/RadioLib/blob/690a050ebb46e6097c5d00c371e961c1caa3b52e/src/modules/LR11x0/LR11x0.h#L471C26-L471C104
