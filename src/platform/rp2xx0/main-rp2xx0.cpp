@@ -170,7 +170,7 @@ void initVariant()
     clock_configure(clk_adc, 0, CLOCKS_CLK_ADC_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, RP2XX0_CLOCK_OVERRIDE * MHZ,
                     RP2XX0_CLOCK_OVERRIDE * MHZ);
     /* Run RTC from XOSC since USB clock is off if chipset has RTC, RP2350 does not */
-#if !defined(ARCH_RP2350)
+#if defined(__PLAT_RP2040__)
     clock_configure(clk_rtc, 0, CLOCKS_CLK_RTC_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 12 * MHZ, 47 * KHZ);
 #endif
     /* Turn off USB PLL if set speed is lower than the USB spec allows */
