@@ -188,7 +188,7 @@ ErrorCode Router::sendLocal(meshtastic_MeshPacket *p, RxSource src)
 
         // don't override if a channel was requested and no need to set it when PKI is enforced
         if (!p->channel && !p->pki_encrypted && !isBroadcast(p->to)) {
-            meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(p->to);
+            meshtastic_NodeInfoLite const *node = nodeDB->getMeshNode(p->to);
             if (node) {
                 p->channel = node->channel;
                 LOG_DEBUG("localSend to channel %d", p->channel);
@@ -372,7 +372,7 @@ DecodeState perhapsDecode(meshtastic_MeshPacket *p)
                 p->pki_encrypted = true;
                 memcpy(&p->public_key.bytes, nodeDB->getMeshNode(p->from)->user.public_key.bytes, 32);
                 p->public_key.size = 32;
-                memcpy(&p->decoded, &decodedtmp, sizeof(meshtastic_Data_msg));
+                p->decoded = decodedtmp;
                 p->which_payload_variant = meshtastic_MeshPacket_decoded_tag; // change type to decoded
             } else {
                 LOG_ERROR("PKC Decrypted, but pb_decode failed!");
@@ -688,7 +688,7 @@ void Router::perhapsHandleReceived(meshtastic_MeshPacket *p)
         return;
     }
 
-    meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(p->from);
+    meshtastic_NodeInfoLite const *node = nodeDB->getMeshNode(p->from);
     if (node != NULL && node->is_ignored) {
         LOG_DEBUG("Ignore msg, 0x%x is ignored", p->from);
         packetPool.release(p);
