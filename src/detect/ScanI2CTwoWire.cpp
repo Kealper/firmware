@@ -227,9 +227,6 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                     type = PMU_AXP192_AXP2101;
                 }
                 break;
-#ifdef HAS_LP5562
-                SCAN_SIMPLE_CASE(LP5562_ADDR, LP5562, "LP5562", (uint8_t)addr.address);
-#endif
             case BME_ADDR:
             case BME_ADDR_ALTERNATE:
                 registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0xD0), 1); // GET_ID
@@ -361,7 +358,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
             case SHT31_4x_ADDR:     // same as OPT3001_ADDR_ALT
             case SHT31_4x_ADDR_ALT: // same as OPT3001_ADDR
                 registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x89), 2);
-                if (registerValue == 0x11a2 || registerValue == 0x11da || registerValue == 0xe9c) {
+                if (registerValue == 0x11a2 || registerValue == 0x11da || registerValue == 0xe9c || registerValue == 0xc8d) {
                     type = SHT4X;
                     logFoundDevice("SHT4X", (uint8_t)addr.address);
                 } else if (getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x7E), 2) == 0x5449) {
@@ -437,6 +434,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                 SCAN_SIMPLE_CASE(MAX1704X_ADDR, MAX17048, "MAX17048", (uint8_t)addr.address);
                 SCAN_SIMPLE_CASE(DFROBOT_RAIN_ADDR, DFROBOT_RAIN, "DFRobot Rain Gauge", (uint8_t)addr.address);
                 SCAN_SIMPLE_CASE(LTR390UV_ADDR, LTR390UV, "LTR390UV", (uint8_t)addr.address);
+                SCAN_SIMPLE_CASE(PCT2075_ADDR, PCT2075, "PCT2075", (uint8_t)addr.address);
 #ifdef HAS_TPS65233
                 SCAN_SIMPLE_CASE(TPS65233_ADDR, TPS65233, "TPS65233", (uint8_t)addr.address);
 #endif
